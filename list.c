@@ -4,14 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-void printl(struct list *linkedList)
-{
-    while (linkedList != NULL)
-    {
-        printf("%s\n", linkedList->head->val);
-        linkedList->head = linkedList->head->next;
-    }
-}
 void insertToList(struct list *linkedList, char *ipAddress, pthread_mutex_t listLock, pthread_cond_t cv)
 {
     struct listelement *newElement = (struct listelement *)malloc(sizeof(struct listelement));
@@ -44,18 +36,14 @@ char *pullFromList(struct list *linkedList, pthread_mutex_t listLock, pthread_co
 
     pthread_mutex_lock(&listLock);
 
-    if (linkedList->head == NULL)
+    while (linkedList->head == NULL)
         pthread_cond_wait(&cv, &listLock);
-    if (linkedList->head != NULL)
-    {
-        struct listelement *temporaryElement = linkedList->head;
-        char *ip = linkedList->head->val;
-        linkedList->head = linkedList->head->next;
-        free(temporaryElement);
-        pthread_mutex_unlock(&listLock);
-        printf("ip  %s\n", ip);
-        return ip;
-    }
+
+    struct listelement *temporaryElement = linkedList->head;
+    char *ip = linkedList->head->val;
+    linkedList->head = linkedList->head->next;
+    free(temporaryElement);
     pthread_mutex_unlock(&listLock);
-    return NULL;
+    printf("ip  %s\n", ip);
+    return ip;
 }
