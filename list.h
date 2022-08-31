@@ -12,7 +12,8 @@ struct list
 {
   struct listelement *head;
   struct listelement *tail;
+  int count;
 };
 
-void insertToList(struct list *linkedList, char *ipAddress, pthread_mutex_t listLock, pthread_cond_t cv);
-char *pullFromList(struct list *linkedList, pthread_mutex_t listLock, pthread_cond_t cv);
+void insertToList(struct list *linkedList, char *ipAddress, pthread_mutex_t *listLock, pthread_cond_t* cv);
+char *pullFromList(struct list *linkedList, pthread_mutex_t * listLock, pthread_cond_t* cv);

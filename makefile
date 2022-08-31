@@ -6,7 +6,7 @@ else
 	CFLAGS := -Wall -O1 
 endif
 
-LDFLAGS := -lpcap -l sqlite3 -pthread -Wall 
+LDFLAGS := -lpcap -l sqlite3 -pthread -Wall -g
 
 # -fsanitize=address
 
@@ -23,6 +23,6 @@ list.o: list.c list.h
 	$(CC) $(CFLAGS) -c list.c $(LDFLAGS)
 
 clear:
-	rm *.o run
+	rm  -f *.o run log.txt
 	
 

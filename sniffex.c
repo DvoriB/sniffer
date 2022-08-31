@@ -25,13 +25,15 @@
 #include <sqlite3.h>
 #include "db_function.h"
 #include "list.h"
+#include "encode.c"
 #include <signal.h>
-
 #include <errno.h>
-
 #include <linux/tcp.h>
+#include "print_packet.c"
 struct list *linkedList; /* global list */
+
 pthread_mutex_t listLock = PTHREAD_MUTEX_INITIALIZER;
+int tcp = 0, udp = 0, icmp = 0, others = 0, igmp = 0, total = 0;
 pthread_cond_t cv;
 pthread_t thread_list;
 #define COUNT 6 // number of attempts
@@ -44,16 +46,10 @@ sigset_t *fSigSet;
 sqlite3 *DB;
 sqlite3 *DB_BLOCK;
 char *messaggeError;
+char *password;
 static int counter = 0;
-void got_packet(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet);
-
-void print_payload(const unsigned char *payload, int len);
-
-void print_hex_ascii_line(const unsigned char *payload, int len, int offset);
-
-void print_app_banner(void);
-
-void print_app_usage(void);
+char *command;
+FILE *logfile;
 
 static int callback(void *data, int argc, char **argv, char **azColName);
 
@@ -61,7 +57,7 @@ void creacte_blocked_packet_table(sqlite3 *DB)
 {
 	char *blocked_table = "CREATE TABLE BLOCKED("
 						  "ip   CHAR(50)  PRIMARY KEY);\0";
-	printf("%p\n", DB);
+
 	creat_table(DB, blocked_table);
 }
 
@@ -72,37 +68,87 @@ void SIGNAL_THREAD()
 		int nSig;
 		sigwait(&fSigSet, &nSig);
 
-		printf("To display the blocked addresses press 1\nTo remove an address from the black list, press 2\nTo stop the program press 3\n");
+		printf("To display the blocked addresses press 1\nTo remove an address from the black list press 2\nTo print the ip that have the maximum number of packets press 3\nTo print the count of all the ip recived press 4\nTo print the count of all the ip address order by protocol type press 5\nTo get all the packet's data in a log file press 6\nTo stop the program press 7\n");
 		int selected;
-		int ip;
+
 		scanf("%d", &selected);
 		switch (selected)
 		{
 		case 1:
 		{
-			// select_from_db(DB, "SELECT  COUNT(src_ip) as count, src_ip FROM PACKET GROUP BY src_ip ", callback);
+
 			select_from_db(DB, "SELECT * FROM BLOCKED", callback);
+
 			break;
 		};
 		case 2:
 		{
+			char *ip = (char *)malloc(sizeof(char) * 20);
 			printf("enter ip");
-			scanf("%d", &ip);
+			scanf("%s", ip);
 			char buffer[1024];
-			snprintf(buffer, sizeof(buffer), "DELETE FROM BLOCKED WHERE ip = '%d';", ip);
-
+			snprintf(buffer, sizeof(buffer), "DELETE FROM BLOCKED WHERE ip = '%s';", ip);
 			select_from_db(DB, buffer, callback);
+			sprintf(buffer, " echo %s | sudo -S  iptables -A INPUT -d %s  -j ACCEPT", password, ip);
+			printf("%s----\n", buffer);
+			system(buffer);
 			break;
 		};
 		case 3:
 		{
-			exit(0);
+			printf("The ip that sent maximum number of packets is:\n");
+			select_from_db(DB, "SELECT MAX(count) as items , src_ip as ip FROM (SELECT  src_ip, COUNT(src_ip) as count FROM PACKET GROUP BY src_ip)", callback);
 			break;
 		};
+		case 4:
+		{
+			select_from_db(DB, "SELECT  src_ip, COUNT(src_ip) as count FROM PACKET GROUP BY src_ip", callback);
+			break;
+		}
+		case 5:
+		{
+			printf(" TCP : %d   UDP : %d   ICMP : %d   IGMP : %d   Other's : %d   Total : %d\n", tcp, udp, icmp, igmp, others, total);
+			break;
+		}
+		case 6:
+		{
+			select_from_db(DB, "SELECT * FROM PACKET", print_packet_log);
+			break;
+		}
+		case 7:
+		{
+			exit(0);
+			break;
+		}
 		}
 	}
 }
 
+void count_type(u_char protocol)
+{
+	switch (protocol) // Check the Protocol and do accordingly...
+	{
+	case 1: // ICMP Protocol
+		++icmp;
+		break;
+
+	case 2: // IGMP Protocol
+		++igmp;
+		break;
+
+	case 6: // TCP Protocol
+		++tcp;
+		break;
+
+	case 17: // UDP Protocol
+		++udp;
+		break;
+
+	default: // Some Other Protocol like ARP etc.
+		++others;
+		break;
+	}
+}
 void clock_thread()
 {
 
@@ -116,24 +162,44 @@ void clock_thread()
 		// hash = ht_create();
 	}
 }
-void printm(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet)
+void check(const unsigned char *packet, int length)
+{
+	int i, j;
+	for (i = 0; i < length / 4; i++) // number of lines
+	{
+		for (j = 0; j < 4; j++) // prevents more than 4 bytes on a line
+		{
+			printf("%02x  ", *(packet + (i * 4) + j)); // print a byte
+		}
+		printf("\n"); // and a line
+	}
+	printf("---------\n");
+}
+
+void get_packet(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet)
 {
 	const struct sniff_ip *ip = (struct sniff_ip *)(packet + SIZE_ETHERNET);
 	struct tcphdr *tcplayer = (struct tcphdr *)(packet + SIZE_ETHERNET + IPHDRLEN);
+	check(packet, sizeof(packet));
+	count_type(ip->ip_p);
+	total++;
 	insert_packet(DB, packet);
 	if (ht_get(hash_block, inet_ntoa(ip->ip_src)) != 0) // exist in hash
 		return;
+
 	if (tcplayer->syn)
 	{
 		if (!(tcplayer->urg && tcplayer->ack && tcplayer->psh && tcplayer->rst && tcplayer->fin))
 		{
-			int value = ht_get(hash, inet_ntoa(ip->ip_src)) + 1;
-
+			int value = (int)ht_get(hash, inet_ntoa(ip->ip_src)) + 1;
 			ht_set(hash, inet_ntoa(ip->ip_src), value);
 
 			if (value == COUNT) // if --somethink
 			{
-				insertToList(linkedList, inet_ntoa(ip->ip_src), listLock, cv);
+				if (ht_get(hash_block, inet_ntoa(ip->ip_src)) != 0) // exist in hash
+					return;
+				ht_set(hash_block, inet_ntoa(ip->ip_src), (void *)value);
+				insertToList(linkedList, inet_ntoa(ip->ip_src), &listLock, &cv);
 			}
 			counter++;
 		}
@@ -141,13 +207,11 @@ void printm(unsigned char *args, const struct pcap_pkthdr *header, const unsigne
 }
 void my_signal_handler(int signum)
 {
-	printf("jjjjj\n");
 	pthread_kill(threads[3], SIGUSR1);
 }
 
 int register_signal_handling()
 {
-	printf("hh\n");
 	struct sigaction new_action;
 	memset(&new_action, 0, sizeof(new_action));
 	new_action.sa_handler = my_signal_handler; // Assign the new sinal handler, overwrite default behavior for ctrl+c
@@ -157,29 +221,24 @@ int register_signal_handling()
 
 void blockIP(char *ip)
 {
-	char buffer[1024];
-	snprintf(buffer, sizeof(buffer), "INSERT INTO BLOCKED VALUES('%s');", ip);
-	printf("%s\n", buffer);
-	query(DB, buffer);
-	// ht_set(hash, ip, value);
 
-	// printf("block ip adress - %s - \n", ip);
-	// char *command = (char *)malloc(sizeof(char) * 100);
-	// strcpy(command, "echo 213089345 | sudo -S iptables -I INPUT -d ");
-	// strcat(command, ip);
-	// strcat(command, " -j DROP");
-	// printf("%s\n", command);
-	// system(command);
+	char buffer[1024];
+	command = (char *)malloc(sizeof(char) * 1024);
+
+	snprintf(buffer, sizeof(buffer), "INSERT INTO BLOCKED VALUES('%s');", ip);
+	query(DB, buffer);
+	// snprintf(command, sizeof(command), " echo '%s' | base64 -d | sudo -S iptables -I INPUT -d %s -j DROP ", password, ip);
+	sprintf(command, " echo %s | sudo -S iptables -I INPUT -d %s -j DROP", password, ip);
+	system(command);
+	command = "";
 }
 
-void *threadFunction()
+void threadFunction()
 {
 	while (1)
 	{
-		printf("jjjj\n");
 
-		char *ip = pullFromList(linkedList, listLock, cv);
-		printf("pull from list ip adress - %s - \n", ip);
+		char *ip = pullFromList(linkedList, &listLock, &cv);
 
 		blockIP(ip);
 	}
@@ -194,7 +253,6 @@ void creact_packet_table(sqlite3 *DB)
 				  "dest_ip   CHAR(50) NOT NULL, "
 				  "src_port   CHAR(50) NOT NULL, "
 				  "dest_port   CHAR(50) NOT NULL );\0";
-	printf("%p\n", DB);
 	creat_table(DB, table);
 }
 static int callback(void *data, int argc, char **argv, char **azColName)
@@ -211,9 +269,11 @@ static int callback(void *data, int argc, char **argv, char **azColName)
 static int initHashBlockFromDB(void *data, int argc, char **argv, char **azColName)
 {
 	int i;
+
 	for (i = 0; i < argc; i++)
 	{
-		ht_set(hash_block, azColName[i], argv[i] ? argv[i] : "NULL");
+		void *value = 0;
+		ht_set(hash_block, (char *)argv[i] ? (char *)argv[i] : "", value ? value : "0");
 	}
 
 	return 0;
@@ -222,6 +282,7 @@ void initHashBlock()
 {
 	select_from_db(DB, "SELECT * FROM BLOCKED", initHashBlockFromDB);
 }
+
 int main(int argc, char **argv)
 {
 	clock_t begin = clock();
@@ -310,7 +371,28 @@ int main(int argc, char **argv)
 				filter_exp, pcap_geterr(handle));
 		exit(EXIT_FAILURE);
 	}
+	// command = (char *)malloc(sizeof(char) * 1024);
+
+	// char buffer[100];
+	// snprintf(buffer, sizeof(buffer), "echo '%s' | base64;", password);
+	// printf("-- %s --\n", buffer);
+	// //password = (char *)system(buffer);
+	// // printf("%s",password);
+	// password[strlen(password)] = '\0';
+
+	// int len_str;
+	// len_str =strlen(password);
+	// len_str -= 1;
+	// printf("Input string is : %s", password);
+	// password=base64Encoder(password, len_str);
+	// printf("Input string is : %s", password);
+
 	/* now we can set our callback function */
+	logfile = fopen("log.txt", "w");
+	if (logfile == NULL)
+	{
+		printf("Unable to create log.txt file.");
+	}
 	sigemptyset(&fSigSet);
 	sigaddset(&fSigSet, SIGUSR1);
 	sigaddset(&fSigSet, SIGSEGV);
@@ -320,37 +402,29 @@ int main(int argc, char **argv)
 	char *db_name = "db_name.db";
 	DB = creat_or_open_db(db_name, DB);
 	initHashBlock();
-
 	pthread_cond_init(&cv, NULL);
 	linkedList = malloc(sizeof(struct list));
 	linkedList->head = NULL;
-
-	// creact_packet_table(DB);
-	// creacte_blocked_packet_table(DB);
-	query(DB, "INSERT INTO BLOCKED VALUES('1111');");
-
-	blockIP("1234");
-
-	// list();
+	linkedList->count = 0;
+	password = (char *)malloc(sizeof(char) * 100);
+	puts("insert a password ");
+	scanf("%s", password);
+	creact_packet_table(DB);
+	creacte_blocked_packet_table(DB);
 	pthread_sigmask(SIG_BLOCK, &fSigSet, NULL);
 	pthread_create(&threads[3], NULL, SIGNAL_THREAD, NULL);
 	pthread_create(&threads[0], NULL, clock_thread, NULL);
-	pthread_create(&threads[1], NULL, &threadFunction, NULL);
-	pcap_loop(handle, num_packets, printm, NULL);
+	pthread_create(&threads[1], NULL, threadFunction, NULL);
+	pcap_loop(handle, num_packets, get_packet, NULL);
 	printf("total entries: %zu\n", hash->capacity);
 	/* cleanup */
 	ht_destroy(hash);
 	pcap_freecode(&fp);
 	pcap_close(handle);
 	pcap_freealldevs(alldevs);
-	// select_from_db(DB, "SELECT  COUNT(src_ip) as count, src_ip FROM PACKET GROUP BY src_ip ", callback);
 
-	// printf("\nCapture complete.\n");
-	// clock_t end = clock();
-	// double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-	// printf("%f\n", time_spent);
-	void **status;
 	while (1)
-		;
+	{
+	};
 	return 0;
 }
