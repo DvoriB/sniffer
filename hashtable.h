@@ -29,5 +29,5 @@ ht *ht_create(void);
 void ht_destroy(ht *table);
 void *ht_get(ht *table, const char *key);
 const char *ht_set(ht *table, const char *key, void *value);
-static const char *ht_set_entry(ht_entry *entries, size_t capacity,const char *key, void *value, size_t *plength);
+static const char *ht_set_entry(ht_entry *entries, size_t capacity, const char *key, void *value, size_t *plength);
 void ht_reset(ht *table);

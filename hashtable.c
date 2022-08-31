@@ -6,7 +6,7 @@
 #include <pthread.h>
 #define FNV_OFFSET 14695981039346656037UL
 #define FNV_PRIME 1099511628211UL
-#define INITIAL_CAPACITY 100                        // must not be zero
+#define INITIAL_CAPACITY 100
 pthread_mutex_t hashMutex = PTHREAD_MUTEX_INITIALIZER; // mutex for hashtab
 
 ht *ht_create(void)

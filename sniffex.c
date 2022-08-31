@@ -25,7 +25,7 @@
 #include <sqlite3.h>
 #include "db_function.h"
 #include "list.h"
-#include "encode.c"
+
 #include <signal.h>
 #include <errno.h>
 #include <linux/tcp.h>
@@ -67,8 +67,7 @@ void SIGNAL_THREAD()
 	{
 		int nSig;
 		sigwait(&fSigSet, &nSig);
-
-		printf("To display the blocked addresses press 1\nTo remove an address from the black list press 2\nTo print the ip that have the maximum number of packets press 3\nTo print the count of all the ip recived press 4\nTo print the count of all the ip address order by protocol type press 5\nTo get all the packet's data in a log file press 6\nTo stop the program press 7\n");
+		printf("		To display the blocked addresses press 1\n		To remove an address from the black list press 2\n		To print the ip that have the maximum number of packets press 3\n		To print the count of all the ip recived press 4\n		To print the count of all the ip address order by protocol type press 5\n		To get all the packet's data in a log file press 6\n		To stop the program press 7\n");
 		int selected;
 
 		scanf("%d", &selected);
@@ -78,20 +77,22 @@ void SIGNAL_THREAD()
 		{
 
 			select_from_db(DB, "SELECT * FROM BLOCKED", callback);
-
+			printf("--------\n");
 			break;
 		};
 		case 2:
 		{
 			char *ip = (char *)malloc(sizeof(char) * 20);
-			printf("enter ip");
+			printf("enter ip\n");
 			scanf("%s", ip);
 			char buffer[1024];
 			snprintf(buffer, sizeof(buffer), "DELETE FROM BLOCKED WHERE ip = '%s';", ip);
 			select_from_db(DB, buffer, callback);
 			sprintf(buffer, " echo %s | sudo -S  iptables -A INPUT -d %s  -j ACCEPT", password, ip);
-			printf("%s----\n", buffer);
+
 			system(buffer);
+			printf("--------\n");
+
 			break;
 		};
 		case 3:
@@ -103,21 +104,29 @@ void SIGNAL_THREAD()
 		case 4:
 		{
 			select_from_db(DB, "SELECT  src_ip, COUNT(src_ip) as count FROM PACKET GROUP BY src_ip", callback);
+			printf("--------\n");
+
 			break;
 		}
 		case 5:
 		{
 			printf(" TCP : %d   UDP : %d   ICMP : %d   IGMP : %d   Other's : %d   Total : %d\n", tcp, udp, icmp, igmp, others, total);
+			printf("--------\n");
+
 			break;
 		}
 		case 6:
 		{
 			select_from_db(DB, "SELECT * FROM PACKET", print_packet_log);
+			printf("--------\n");
+
 			break;
 		}
 		case 7:
 		{
 			exit(0);
+			printf("--------\n");
+
 			break;
 		}
 		}
@@ -156,31 +165,15 @@ void clock_thread()
 	{
 		sleep(20);
 
-		// here we need to insert readers writers
 		ht_reset(hash);
-		// ht_destroy(hash);
-		// hash = ht_create();
 	}
-}
-void check(const unsigned char *packet, int length)
-{
-	int i, j;
-	for (i = 0; i < length / 4; i++) // number of lines
-	{
-		for (j = 0; j < 4; j++) // prevents more than 4 bytes on a line
-		{
-			printf("%02x  ", *(packet + (i * 4) + j)); // print a byte
-		}
-		printf("\n"); // and a line
-	}
-	printf("---------\n");
 }
 
 void get_packet(unsigned char *args, const struct pcap_pkthdr *header, const unsigned char *packet)
 {
 	const struct sniff_ip *ip = (struct sniff_ip *)(packet + SIZE_ETHERNET);
 	struct tcphdr *tcplayer = (struct tcphdr *)(packet + SIZE_ETHERNET + IPHDRLEN);
-	check(packet, sizeof(packet));
+
 	count_type(ip->ip_p);
 	total++;
 	insert_packet(DB, packet);
@@ -215,7 +208,6 @@ int register_signal_handling()
 	struct sigaction new_action;
 	memset(&new_action, 0, sizeof(new_action));
 	new_action.sa_handler = my_signal_handler; // Assign the new sinal handler, overwrite default behavior for ctrl+c
-	// new_action.sa_handler = SIG_IGN; // Just ignore  ctrl+c
 	return sigaction(SIGINT, &new_action, NULL);
 }
 
@@ -224,10 +216,8 @@ void blockIP(char *ip)
 
 	char buffer[1024];
 	command = (char *)malloc(sizeof(char) * 1024);
-
 	snprintf(buffer, sizeof(buffer), "INSERT INTO BLOCKED VALUES('%s');", ip);
 	query(DB, buffer);
-	// snprintf(command, sizeof(command), " echo '%s' | base64 -d | sudo -S iptables -I INPUT -d %s -j DROP ", password, ip);
 	sprintf(command, " echo %s | sudo -S iptables -I INPUT -d %s -j DROP", password, ip);
 	system(command);
 	command = "";
@@ -239,7 +229,6 @@ void threadFunction()
 	{
 
 		char *ip = pullFromList(linkedList, &listLock, &cv);
-
 		blockIP(ip);
 	}
 }
