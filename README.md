@@ -35,7 +35,6 @@ make clear
 
 ## Authors
 
-Contributors names and contact info
 
 Yael Hviv <br />
 Racheli Hadad <br />
