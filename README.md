@@ -21,6 +21,7 @@ We have enabled a user interface using the ^C signal that presents the user with
 * "sudo apt install net-tools"
 ### Executing program
 
+run
 ```
 git clone git@github.com:DvoriB/sniffer.git 
 cd sniffer
