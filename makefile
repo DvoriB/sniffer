@@ -1,14 +1,14 @@
 CC := clang
 
 ifeq ($(DEBUG),1)
-	CFLAGS := -Wall -O0 
+	CFLAGS := -Wall -O0 -g
 else
 	CFLAGS := -Wall -O1 
 endif
 
-LDFLAGS := -lpcap -l sqlite3 -pthread -Wall -g
+LDFLAGS := -lpcap -l sqlite3 -pthread  
 
-# -fsanitize=address
+# -fsanitize=address -Wall
 
 run: sniffex.o hashtable.o db_function.o list.o
 	$(CC) -o run sniffex.o  hashtable.o db_function.o  list.o $(LDFLAGS)

@@ -118,6 +118,7 @@ void SIGNAL_THREAD()
 		case 6:
 		{
 			select_from_db(DB, "SELECT * FROM PACKET", print_packet_log);
+			printf("print tha data to a log file\n");
 			printf("--------\n");
 
 			break;
