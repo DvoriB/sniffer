@@ -13,12 +13,6 @@ The hash table is reset every period of time in order to detect an increased amo
 We have enabled a user interface using the ^C signal that presents the user with an opportunity to get a glimpse of the program's operation.
 
 ## Getting Started
-
-### Dependencies
-
-* Describe any prerequisites, libraries, OS version, etc., needed before installing program.
-* ex. Windows 10
-
 ### Installing
 
 * "sudo apt install clang"
@@ -43,10 +37,10 @@ make clear
 
 Contributors names and contact info
 
-ex. Yael Hviv <br />
-ex. Racheli Hadad <br />
-ex. Nechami Weiss <br />
-ex. Dvori Blatt
+Yael Hviv <br />
+Racheli Hadad <br />
+Nechami Weiss <br />
+Dvori Blatt
 
 ## Acknowledgments
 
