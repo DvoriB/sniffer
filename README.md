@@ -44,6 +44,5 @@ Dvori Blatt
 
 ## Acknowledgments
 
-Inspiration, code snippets, etc.
 * [threadpool-packet-sniffe](https://github.com/joverandout/threadpool-packet-sniffer)
 
