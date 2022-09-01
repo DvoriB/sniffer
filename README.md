@@ -43,9 +43,9 @@ make clear
 
 Contributors names and contact info
 
-ex. Yael Hviv__
-ex. Racheli Hadad__
-ex. Nechami Weiss__
+ex. Yael Hviv <br />
+ex. Racheli Hadad <br />
+ex. Nechami Weiss <br />
 ex. Dvori Blatt
 
 ## Acknowledgments
