@@ -21,29 +21,31 @@ We have enabled a user interface using the ^C signal that presents the user with
 
 ### Installing
 
-* git clone 
 * "sudo apt install clang"
 * "sudo apt install sqlite3 libsqlite3-dev"
 * "sudo apt-get install git libpcap-dev"
 * "sudo apt install net-tools"
 ### Executing program
 
-* How to run the program
-* Step-by-step bullets
 ```
+git clone git@github.com:DvoriB/sniffer.git 
+cd sniffer
 make
 sudo ./run
 ```
-
+clear:
+```
+make clear
+```
 
 
 ## Authors
 
 Contributors names and contact info
 
-ex. Yael Hviv
-ex. Racheli Hadad
-ex. Nechami Weiss
+ex. Yael Hviv__
+ex. Racheli Hadad__
+ex. Nechami Weiss__
 ex. Dvori Blatt
 
 ## Acknowledgments
